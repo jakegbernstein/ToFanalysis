@@ -49,19 +49,7 @@ if ~isempty(find((trigindices(2:end)-trigindices(1:end-1)) ~= wavelength))
     warning("Your clocks are messed up!")
 end
 meanwaveform = mean(reshape(fineLED(trigindices(1)+(1:wavelength*(length(trigindices)-1))),wavelength,[]),2);
-%%If you want to set DC value to 0;
-%meanwaveform = meanwaveform - mean(meanwaveform);
-%%%OLD VERSION
-%Calculate meanwaveform             
-%wavelength = max(trigindices(2:end) - trigindices(1:end-1));
-% %%Iterate through indices, adding to meanwaveform
-% meanwaveform = zeros(wavelength,1);
-% for i=1:length(trigindices)-1
-%     meanwaveform = meanwaveform + ...
-%                    rawdat(trigindices(i):trigindices(i)+wavelength-1, chan_LED);
-% end
-% meanwaveform = meanwaveform / (length(trigindices)-1);
-%wavelength = lightperiod/fineinterval;
+
 if plotfigs
     figure
     plot(fineinterval*(1:wavelength),meanwaveform)
@@ -74,7 +62,7 @@ end
 DCI = @(shift) sum(meanwaveform(mod(shift+(1:wavelength),wavelength) <  wavelength/2)) -...
                sum(meanwaveform(mod(shift+(1:wavelength),wavelength) >= wavelength/2));
 DCIconv = arrayfun(DCI,1:wavelength);
-DCIconvshift = [DCIconv(1+wavelength/4:end),DCIconv(1:wavelength/4)];
+DCIconvshift = [DCIconv(.75*wavelength+1:end),DCIconv(1:.75*wavelength)];
 DCIamplitude = abs(DCIconv)+abs(DCIconvshift);
 normDCIconv = DCIconv ./ DCIamplitude;
 normDCIconvshift = DCIconvshift ./ DCIamplitude;
@@ -96,16 +84,60 @@ if plotfigs
     hold on
     plot((1:wavelength+1)/wavelength,normDCIconvshift,'r')
 end
+
+%%% Calculate deviation of real LED waveform from ideal
+%Construct ideal line based on zero crossings
+p0rising = invertDCI(0,-1);
+p0falling = invertDCI(0,1);
+if abs(p0rising - p0falling) ~= .5
+    warning('Duty cycle is not 50%')
+end
+idslope = 4/wavelength;
+idstartind = ceil(p0rising*wavelength);
+idstartval = idslope*(idstartind-p0rising*wavelength);
+idconv(1+mod(idstartind-1+[0:wavelength-1],wavelength)) = arrayfun(@triwave,idstartval + idslope*[0:wavelength-1]);
+figure
+subplot(3,1,1)
+plot(normDCIconv)
+hold on
+plot(idconv)
+subplot(3,1,2)
+plot(normDCIconv(1:end-1)-idconv)
+subplot(3,1,3)
+plot(abs((normDCIconv(2:end)-normDCIconv(1:end-1))))
+
+
+    function out = triwave(amp)
+        t = mod(amp,4);
+        if t<1
+            out = t;
+        elseif t<3
+            out = 2-t;
+        else
+            out = t-4;
+        end
+    end
+
+
 %% Make inverse function
 %Given DCI values, calculate phase shift
 %Assume that DCI sections are monotonic
 %Figure out section, then interpolate between points
-    function [phase, quality] = invertDCI(DCI0,DCI1)
+    function [phase, quality] = invertDCI(DCI0,DCI1,varargin)
+        switch nargin
+            case 4
+            DCI0 = DCI0 - varargin{1};
+            DCI1 = DCI1 - varargin{2};
+        end
         amp = abs(DCI0) + abs(DCI1);
-        if (DCI0 == 0 && DCI1 == 0) || isnan(DCI1) || isnan(DCI0)
+        if find(isnan([DCI0,DCI1]))
+            quality = NaN;
+            phase = -1;
+        elseif (DCI0 == 0 && DCI1 == 0)
             phase = -1;
             quality = 0;
         else
+            quality = sqrt(DCI0^2 + DCI1^2);
             normDCI0 = DCI0/amp;
             normDCI1 = DCI1/amp;
             %Special case: normDCI0 = 1 or -1, then find where norm DCI1==0
@@ -115,26 +147,23 @@ end
                 slope = normDCIconvshift(riseind+1) - normDCIconvshift(riseind);
                 est = (normDCI1 - normDCIconvshift(riseind))/slope;
                 phase = mod((riseind + est)/wavelength, 1);
-                quality = 1;
             elseif normDCI0 <= min(normDCIconv)
                 fallind = find((normDCIconvshift(1:end-1) >= normDCI1) & ...
                                (normDCIconvshift(2:end)   <  normDCI1));                
                 slope = normDCIconvshift(fallind+1) - normDCIconvshift(fallind);
                 est = (normDCI1 - normDCIconvshift(fallind))/slope;
-                phase = mod((fallind + est)/wavelength, 1);
-                quality = 1;
+                phase = mod((fallind + est)/wavelength, 1);                
             else
                 riseind = find((normDCIconv(1:end-1) <= normDCI0) & (normDCIconv(2:end) > normDCI0));
                 fallind = find((normDCIconv(1:end-1) >= normDCI0) & (normDCIconv(2:end) < normDCI0));
-                if (normDCI1 > min(normDCIconvshift(riseind+(0:1)))) && (normDCI1 < max(normDCIconvshift(riseind+(0:1))))
+                if ((normDCI1 > min(normDCIconvshift(riseind+(0:1)))) && (normDCI1 < max(normDCIconvshift(riseind+(0:1))))) || normDCI1 <= min(normDCIconvshift)
                     section = riseind+(0:1);
                 else
                     section = fallind+(0:1);
                 end
                 slope = normDCIconv(section(2)) - normDCIconv(section(1));
                 est = (normDCI0 - normDCIconv(section(1)))/slope;
-                phase = mod((section(1) + est)/wavelength, 1);
-                quality = 1;
+                phase = mod((section(1) + est)/wavelength, 1);                
             end
         end
     end
