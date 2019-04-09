@@ -17,21 +17,15 @@ rawdat = csvread([filename,'.csv']);
 %FORNOW: hardcode
 imagesize=[320,240];
 DCIperimage = 4;
-numsamples = size(rawdat,1)/(imagesize(2) * DCIperimage);
+%numsamples = size(rawdat,1)/(imagesize(2) * DCIperimage);
 
 %Process raw data into easier format: [row, column, DCIframe, imagenum]
 dat = permute(reshape(rawdat',imagesize(1),imagesize(2),DCIperimage,[]),[2 1 3 4]);
 
-for i=0:numsamples-1
-    f0 = getDCIframe(i,0);
-    f1 = getDCIframe(i,1);
-    pics{i} = arrayfun(invDCI,f0,f1);
+for i=1:size(dat,4)    
+    pics{i} = arrayfun(invDCI,dat(:,:,1,i),dat(:,:,2,i));
 end
 
-function outframe = getDCIframe(samplenum,DCInum)
-    row0 = (samplenum*DCIperimage + DCInum)*imagesize(2);
-    outframe = rawdat([row0+(1:imagesize(2))],:);
-end    
 
 end
 
