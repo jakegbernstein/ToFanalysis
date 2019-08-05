@@ -71,15 +71,17 @@ for i=1:size(filelist,1)
         tmpfilename = filelist(i,j).filename;
         fid = fopen(['./images/',tmpfilename]);
         tmprawdat = fread(fid,Inf,'uint16');
+        tmpdat = [];
         tmpdat.raw = permute(reshape(tmprawdat',IMAGESIZE(2),IMAGESIZE(1),DCIPERIMAGE),[2 1 3]);
-        tmpdat.out = [];
+        tmpdat.out = struct;
         tmpdat.distances = [];
         tmpdat.qualities = [];
+        tmpdat.phases = [];
         for k=1:length(inStruct.imageprocess)
             if ~isfield(inStruct.imageprocess(k),'params')
                 inStruct.imageprocess(k).params = [];
             end
-            tmpdat = feval(inStruct.imageprocess(i).fnname, tmpdat, inStruct.imageprocess(i).params);            
+            tmpdat = feval(inStruct.imageprocess(k).fnname, tmpdat, inStruct.imageprocess(k).params);            
         end
         imagedistances(:,:,i,j) = tmpdat.distances;
         imagequalities(:,:,i,j) = tmpdat.qualities;
