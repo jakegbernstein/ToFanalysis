@@ -19,7 +19,7 @@ if ~isfield(params,'profile')
 end
 
 if ~isfield(params,'framerate')
-    params.framerate = 10;
+    params.framerate = 12;
 end
 
 if ~isfield(params,'nHues')
@@ -46,6 +46,10 @@ if ~isfield(params,'decimation')
     params.decimation = 1;
 end
 
+if ~isfield(params,'buffwidth')
+    params.buffwidth = 10;
+end
+
 %Preprocess the data
 cmap = returnColorMap(params.nHues, params.nShades);
 nrows = size(datstruct.imagedistances,1);
@@ -54,7 +58,7 @@ nframes = size(datstruct.imagedistances,3);
 ncams = size(datstruct.imagedistances,4);
 
 if isempty(params.subvideo)
-    params.subvideo = [1 nframes]
+    params.subvideo = [1 nframes];
 end
 
 framelist = [params.subvideo(1) : params.decimation : params.subvideo(2)];
@@ -66,17 +70,28 @@ open(v)
 
 %Generate the frames and write them to the move
 
-l = 1;
+
 for k= framelist
-    tmpimage = zeros(nrows, ncols, 3);
-    for i = 1:nrows
-        for j = 1:ncols
-            if isnan(datstruct.imagequalities(i,j,k,l))
-                tmpimage(i,j,:) = [0;0;0];
-            else
-                hueInd = dist2hue(datstruct.imagedistances(i,j,k,l));
-                shadeInd = qual2shade(datstruct.imagequalities(i,j,k,l));
-                tmpimage(i,j,:) = squeeze(cmap(hueInd,shadeInd,:));
+    tmpimage = zeros(nrows, ncams*ncols + params.buffwidth*(ncams-1), 3);
+    for l = 1:ncams
+        for i = 1:nrows
+            for j = 1:ncols
+                if l==1
+                    tmprow = i;
+                    tmpcol = j;
+                elseif l==2
+                    tmprow = nrows-i+1;
+                    tmpcol = size(tmpimage,2)-j+1;
+                else
+                    error('cannot deal with more cameras')
+                end
+                if isnan(datstruct.imagequalities(i,j,k,l))
+                    tmpimage(tmprow,tmpcol,:) = [0;0;0];
+                else
+                    hueInd = dist2hue(datstruct.imagedistances(i,j,k,l));
+                    shadeInd = qual2shade(datstruct.imagequalities(i,j,k,l));
+                    tmpimage(tmprow,tmpcol,:) = squeeze(cmap(hueInd,shadeInd,:));
+                end
             end
         end
     end
