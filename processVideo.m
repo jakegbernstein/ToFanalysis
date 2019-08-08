@@ -1,4 +1,4 @@
-function inStruct = processVideo(inStruct)
+function [outStruct,inStruct] = processVideo(inStruct)
 %Process a Prometheus ToF Video
 %Jacob Bernstein
 %Future Ocean Lab
@@ -60,20 +60,26 @@ if ~isfield(inStruct,'imageprocess')
     inStruct.imageprocess(2).fnname = 'drawDistanceHeat';
 end
 
+if ~isfield(inStruct,'outfolder') || isempty(inStruct.outfolder)
+    inStruct.outfolder = ['processruns/',datestr(now,'yymmdd_HHMMSS')];
+end
+
+mkdir(inStruct.outfolder);
 filelist = selectImageFiles(inStruct);
 
 %Load each file, and then process with the image processing stack
 imagedistances = zeros(IMAGESIZE(1),IMAGESIZE(2),size(filelist,1),size(filelist,2));
 imagequalities = zeros(IMAGESIZE(1),IMAGESIZE(2),size(filelist,1),size(filelist,2));
+imagephases    = zeros(IMAGESIZE(1),IMAGESIZE(2),size(filelist,1),size(filelist,2));
 
 for i=1:size(filelist,1)
     for j=1:size(filelist,2)
-        tmpfilename = filelist(i,j).filename;
-        fid = fopen(['./images/',tmpfilename]);
+        tmpdat.out.filename = filelist(i,j).filename;
+        fid = fopen(['./images/',tmpdat.out.filename]);
         tmprawdat = fread(fid,Inf,'uint16');
-        tmpdat = [];
+        fclose(fid);
+        cd(inStruct.outfolder);
         tmpdat.raw = permute(reshape(tmprawdat',IMAGESIZE(2),IMAGESIZE(1),DCIPERIMAGE),[2 1 3]);
-        tmpdat.out = struct;
         tmpdat.distances = [];
         tmpdat.qualities = [];
         tmpdat.phases = [];
@@ -81,12 +87,24 @@ for i=1:size(filelist,1)
             if ~isfield(inStruct.imageprocess(k),'params')
                 inStruct.imageprocess(k).params = [];
             end
-            tmpdat = feval(inStruct.imageprocess(k).fnname, tmpdat, inStruct.imageprocess(k).params);            
+            tmpfunc = str2func(inStruct.imageprocess(k).fnname);
+            tmpdat = tmpfunc(tmpdat, inStruct.imageprocess(k).params);
+            %tmpdat = feval(inStruct.imageprocess(k).fnname, tmpdat, inStruct.imageprocess(k).params);            
+            
         end
         imagedistances(:,:,i,j) = tmpdat.distances;
         imagequalities(:,:,i,j) = tmpdat.qualities;
         imagemeta(i,j) = tmpdat.out;
+        cd(inStruct.rootfolder);
     end
 end
+
+cd(inStruct.outfolder)
+outStruct.distances = imagedistances;
+outStruct.qualities = imagequalities;
+outStruct.phases = imagephases;
+outStruct.meta = imagemeta;
+save('dataoutput.mat','imagedistances','imagequalities','imagephases','imagemeta');
+
 
 end
