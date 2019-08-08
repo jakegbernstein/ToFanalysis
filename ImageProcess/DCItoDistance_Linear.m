@@ -1,6 +1,9 @@
 function datstruct = DCItoDistance_Linear(datstruct, params)
 %Jacob Bernstein
 
+%Input:
+%%% datstruct.DCS
+
 %Output:
 %%% datstruct.distances
 %%% datstruct.qualities
@@ -18,13 +21,13 @@ end
 
 wavelength = SPEEDOFLIGHT/(params.modfreq*N_WATER*2);
 
-if size(datstruct.raw,3) == 2
+if size(datstruct.DCS,3) == 2
     [datstruct.phases, datstruct.qualities] = arrayfun(@distLin,...
-        squeeze(datstruct.raw(:,:,1)),squeeze(datstruct.raw(:,:,2)));
+        squeeze(datstruct.DCS(:,:,1)),squeeze(datstruct.DCS(:,:,2)));
 else
     [datstruct.phases, datstruct.qualities] = arrayfun(@distLin,...
-        squeeze(datstruct.raw(:,:,1))-squeeze(datstruct.raw(:,:,3)),...
-        squeeze(datstruct.raw(:,:,2))-squeeze(datstruct.raw(:,:,4)));
+        squeeze(datstruct.DCS(:,:,1))-squeeze(datstruct.DCS(:,:,3)),...
+        squeeze(datstruct.DCS(:,:,2))-squeeze(datstruct.DCS(:,:,4)));
 end
 datstruct.distances = datstruct.phases*wavelength/(2*pi);
 end

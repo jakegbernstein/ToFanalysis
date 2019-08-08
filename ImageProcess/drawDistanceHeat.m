@@ -36,9 +36,13 @@ cmap = returnColorMap(params.nHues,params.nShades);
 datstruct.image = zeros([size(datstruct.distances),3]);
 for i = 1:size(datstruct.distances,1)
     for j = 1:size(datstruct.distances,2)
-        hueInd = phase2hue(datstruct.phases(i,j));
-        shadeInd = qual2shade(datstruct.qualities(i,j));
-        datstruct.image(i,j,:) = squeeze(cmap(hueInd,shadeInd,:));
+        if isnan(datstruct.qualities(i,j))
+            datstruct.image(i,j,:) = [0; 0; 0];
+        else
+            hueInd = phase2hue(datstruct.phases(i,j));
+            shadeInd = qual2shade(datstruct.qualities(i,j));
+            datstruct.image(i,j,:) = squeeze(cmap(hueInd,shadeInd,:));
+        end
     end
 end
 
