@@ -1,4 +1,4 @@
-function datstruct = DCItoDistance_Linear(datstruct, params)
+function [distances, qualities, phases] = DCItoDistance_Linear(datstruct, params)
 %Jacob Bernstein
 
 %Input:
@@ -8,28 +8,32 @@ function datstruct = DCItoDistance_Linear(datstruct, params)
 %%% datstruct.distances
 %%% datstruct.qualities
 SPEEDOFLIGHT = 3e8;
-N_WATER = 1.33;
+%N_WATER = 1.33;
 
 switch nargin
     case 1
         params = [];
 end
 
-if ~isfield(params,'modfreq')
-    params.modfreq = 12e6;
+if ~isfield(datstruct,'modFreq')
+    params.modfreq = 1;
 end
 
-wavelength = SPEEDOFLIGHT/(params.modfreq*N_WATER*2);
+if ~isfield(datstruct,'frequency')
+    params.frequency = 24e6/(1+params.modfreq);
+end
+
+wavelength = SPEEDOFLIGHT/(datstruct.frequency*datstruct.RefractiveIndex*2);
 
 if size(datstruct.DCS,3) == 2
-    [datstruct.phases, datstruct.qualities] = arrayfun(@distLin,...
+    [phases, qualities] = arrayfun(@distLin,...
         squeeze(datstruct.DCS(:,:,1)),squeeze(datstruct.DCS(:,:,2)));
 else
-    [datstruct.phases, datstruct.qualities] = arrayfun(@distLin,...
+    [phases, qualities] = arrayfun(@distLin,...
         squeeze(datstruct.DCS(:,:,1))-squeeze(datstruct.DCS(:,:,3)),...
         squeeze(datstruct.DCS(:,:,2))-squeeze(datstruct.DCS(:,:,4)));
 end
-datstruct.distances = datstruct.phases*wavelength/(2*pi);
+distances = phases*wavelength/(2*pi);
 end
 
 function [p,q] = distLin(DCI0,DCI1)

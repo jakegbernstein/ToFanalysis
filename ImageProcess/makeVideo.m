@@ -70,9 +70,7 @@ open(v)
 
 %Generate the frames and write them to the move
 
-
 for k= framelist
-<<<<<<< HEAD
     if ncams == 1
         tmpimage = zeros(nrows, ncols, 3);
     else
@@ -88,20 +86,8 @@ for k= framelist
                 elseif l==2
                     tmprow = nrows - i + 1;
                     tmpcol = size(tmpimage,2) - j + 1;
-=======
-    tmpimage = zeros(nrows, ncams*ncols + params.buffwidth*(ncams-1), 3);
-    for l = 1:ncams
-        for i = 1:nrows
-            for j = 1:ncols
-                if l==1
-                    tmprow = i;
-                    tmpcol = j;
-                elseif l==2
-                    tmprow = nrows-i+1;
-                    tmpcol = size(tmpimage,2)-j+1;
                 else
                     error('cannot deal with more cameras')
->>>>>>> a799dd57c875c5b333cc5ec05b326045ec5c434c
                 end
                 if isnan(datstruct.imagequalities(i,j,k,l))
                     tmpimage(tmprow,tmpcol,:) = [0;0;0];

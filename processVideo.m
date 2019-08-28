@@ -7,9 +7,10 @@ function [outStruct,inStruct] = processVideo(inStruct)
 
 %inStruct (input Structure) parameters:
 %%% .rootfolder - contains 'images', 'metadata', and 'processruns' folders
+%%% .metadatatype - 'csv' or 'vidsegfile'
 %%% .vidsegfile - file inside ./metadata with the filenames of video
 %%%         segments
-%%% .vidseg - video segment to analyze, based on 'vidsegs' struture array
+%%% .vidseg - video segment to analyze, based on 'vidsegs' structure array
 %%% .cams - array of cameras to process (process all cameras if empty)
 %%% .subvideo - [startindex stopindex] if want to look at subvideo
 %%%         (complete video if empty)
@@ -35,12 +36,21 @@ end
 cd(inStruct.rootfolder);
 
 if ~isfield(inStruct,'vidsegfile')
-    inStruct.vidsegfile = uigetfile();
+     [file, path] = uigetfile();
+     inStruct.vidsegfile = fullfile(path,file);
+     cd(path);
 end
 
-if ~isfield(inStruct,'vidseg')
+[~,~,vidsegfiletype] = fileparts(inStruct.vidsegfile);
+
+if ~isfield(inStruct,'vidseg') && strcmp(vidsegfiletype,'.mat')
     %ADD output information about video segments
     inStruct.vidseg = input('Input video segment number\n');
+    filelist = selectImageFiles(inStruct);
+end
+
+if ~isfield(inStruct,'vidseg') && strcmp(vidsegfiletype,'.csv')
+    filelist = selectImagesFromCSV(inStruct.vidsegfile);
 end
 
 if ~isfield(inStruct,'cams')
@@ -71,7 +81,7 @@ if ~isfield(inStruct,'outfolder') || isempty(inStruct.outfolder)
 end
 
 mkdir(inStruct.outfolder);
-filelist = selectImageFiles(inStruct);
+
 
 %Load each file, and then process with the image processing stack
 imagedistances = zeros(IMAGESIZE(1),IMAGESIZE(2),size(filelist,1),size(filelist,2));
