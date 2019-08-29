@@ -11,7 +11,11 @@ function [frame, files] = processFrame(frame, files)
 
 IMAGESIZE=[240,320];
 
-inds = frame.fileinds'; %NOTE - vector transposed to make 1xN array
+inds = frame.fileinds; 
+%NOTE - vector transposed to make 1xN array
+if size(inds,1) > 1
+    inds = inds';
+end
 cams = unique([files(inds).cams]);
 for i = inds
     if files(i).piDelay
@@ -19,7 +23,12 @@ for i = inds
     else
         tmpDCSperimage = 2;
     end
-    files(i).DCS = readbin(files(i).Filename,IMAGESIZE,tmpDCSperimage);
+    if isfield(files(i),'filename')
+        tmpfilename = files(i).filename;
+    else
+        tmpefilename = files(i).Filename;
+    end
+    files(i).DCS = readbin(tmpfilename,IMAGESIZE,tmpDCSperimage);
     [files(i).distances, files(i).qualities, files(i).phases] = DCItoDistance_Linear(files(i));
     %files(i).distances = files(i).distances;
     %files(i).qualities = files(i).qualities;
@@ -33,4 +42,6 @@ if strcmpi(frame.type,'average')
     frame.frequency = files(inds(1)).frequency;
 end
     
+if strcmpi(frame.type,'single') && (length(unique([files(frame.inds).cams])) > 1)
+
 end
