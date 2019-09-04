@@ -46,15 +46,27 @@ end
 frameinds = unique(T.(frameheader))';
 for i = frameinds
     frames(i).fileinds = find(T.(frameheader) == i);
-    frames(i).type = T{frames(i).fileinds(1),'frametag'}{1};
     frames(i).RefractiveIndex = files(frames(i).fileinds(1)).RefractiveIndex;
+    %Workaround for csv files created with now frame tage
+    if find(contains(T.Properties.VariableNames,'frametag'))
+        frames(i).type = T{frames(i).fileinds(1),'frametag'}{1};
+    else
+        tempfn = T{frames(i).fileinds(1),'Filename'}{1};
+        exp = '_\d{3}-\d{2}';
+        if regexp(tempfn, exp)
+            frames(i).type = 'HDR';
+        else
+            frames(i).type = 'single';
+        end
+    end        
 end
 
 %Create the 'movies' array
 movieinds = unique(T.(vidheader))';
 movieiends = movieinds(movieinds ~= -1);
 if ~isempty(movieiends)
-    
+    %FIX THIS LATER
+    movies = [];
 else
     movies = [];
 end

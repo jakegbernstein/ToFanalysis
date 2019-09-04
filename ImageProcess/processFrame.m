@@ -16,7 +16,15 @@ inds = frame.fileinds;
 if size(inds,1) > 1
     inds = inds';
 end
-cams = unique([files(inds).cams]);
+%Catch different field tags for the camera
+if isfield(files(inds(1)),'cams')
+    cams = unique([files(inds).cams]);
+elseif isfield(files(inds(1)),'Camera')
+    cams = unique([files(inds).Camera]);
+else
+    error('No cams or Camera field')
+end
+    
 for i = inds
     if files(i).piDelay
         tmpDCSperimage = 4;
@@ -26,7 +34,7 @@ for i = inds
     if isfield(files(i),'filename')
         tmpfilename = files(i).filename;
     else
-        tmpefilename = files(i).Filename;
+        tmpfilename = files(i).Filename;
     end
     files(i).DCS = readbin(tmpfilename,IMAGESIZE,tmpDCSperimage);
     [files(i).distances, files(i).qualities, files(i).phases] = DCItoDistance_Linear(files(i));
@@ -41,7 +49,12 @@ if strcmpi(frame.type,'average')
     frame.phases =    mean(reshape([files(inds).phases],   IMAGESIZE(1),IMAGESIZE(2),[]),3);
     frame.frequency = files(inds(1)).frequency;
 end
-    
+
+%This is for merging together a single frame w/ two cameras
 if strcmpi(frame.type,'single') && (length(unique([files(frame.inds).cams])) > 1)
 
+end
+
+if strcmpi(frame.type,'HDR')
+    
 end
