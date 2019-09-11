@@ -1,4 +1,4 @@
-function [frame, files] = processFrame(frame, files)
+function [frame, files] = processFrame(frame, files, inds, TIMEDELAY)
 
 %frame structure
 %%% Input 
@@ -11,8 +11,17 @@ function [frame, files] = processFrame(frame, files)
 
 IMAGESIZE=[240,320];
 
-inds = frame.fileinds; 
+
 %NOTE - vector transposed to make 1xN array
+switch nargin
+    case 2
+        inds = frame.fileinds; 
+        TIMEDELAY = [];
+    case 3
+        TIMEDELAY = [];
+end
+        
+        
 if size(inds,1) > 1
     inds = inds';
 end
@@ -37,7 +46,7 @@ for i = inds
         tmpfilename = files(i).Filename;
     end
     files(i).DCS = readbin(tmpfilename,IMAGESIZE,tmpDCSperimage);
-    [files(i).distances, files(i).qualities, files(i).phases] = DCItoDistance_Linear(files(i));
+    [files(i).distances, files(i).qualities, files(i).phases] = DCItoDistance_Linear(files(i),[],TIMEDELAY);
     %files(i).distances = files(i).distances;
     %files(i).qualities = files(i).qualities;
     %files(i).phases =    files(i).phases;

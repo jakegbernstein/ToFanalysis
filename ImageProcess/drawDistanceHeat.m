@@ -63,6 +63,7 @@ colormap(squeeze(cmap(:,100,:)));
 run = true;
 if params.displayImage
     figure
+    colorbar
 end
 while(run)
     datstruct.image = zeros([size(datstruct.distances),3]);
@@ -89,6 +90,7 @@ while(run)
 
     if params.displayImage
         datstruct.im = image(datstruct.image);
+        colormap(squeeze(cmap(:,100,:)));
         colorbar('TickLabels',[params.zlim(1):diff(params.zlim)/10:params.zlim(2)]);
     end
 

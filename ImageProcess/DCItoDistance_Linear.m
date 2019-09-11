@@ -1,4 +1,4 @@
-function [distances, qualities, phases] = DCItoDistance_Linear(datstruct, params)
+function [distances, qualities, phases] = DCItoDistance_Linear(datstruct, params, TIMEDELAY)
 %Jacob Bernstein
 
 %Input:
@@ -7,14 +7,20 @@ function [distances, qualities, phases] = DCItoDistance_Linear(datstruct, params
 %Output:
 %%% datstruct.distances
 %%% datstruct.qualities
-TIMEDELAY=36.05E-9; %s
-SPEEDOFLIGHT = 3e8;%m/s
-%N_WATER = 1.33;
-
 switch nargin
     case 1
         params = [];
+        TIMEDELAY = [];
+    case 2
+        TIMEDELAY = [];
 end
+if isempty(TIMEDELAY)
+    TIMEDELAY=2*17.5e-9;
+    %TIMEDELAY=0;
+end
+
+SPEEDOFLIGHT = 3e8;%m/s
+%N_WATER = 1.33;
 
 if ~isfield(datstruct,'modFreq')
     datstruct.modFreq = 1;
@@ -36,7 +42,7 @@ else
         squeeze(datstruct.DCS(:,:,2))-squeeze(datstruct.DCS(:,:,4)));
 end
 phases = phases-phasedelay;
-distances = phases*wavelength/(2*pi);
+distances = phases*wavelength;
 end
 
 function [p,q] = distLin(DCI0,DCI1)
@@ -50,10 +56,14 @@ function [p,q] = distLin(DCI0,DCI1)
         normDCI0 = DCI0/amp;
         normDCI1 = DCI1/amp;
         if normDCI1 > 0
-            p = pi*(1 - normDCI0/2);
+            p = 0.5*(1 - normDCI0/2);
         else
-            p = mod(normDCI0*pi/2, 2*pi);
+            p = mod(normDCI0/2, 1);
         end
     end    
+    if isa(DCI0, 'single')
+        p = single(p);
+        q = single(q);
+    end
 end
 

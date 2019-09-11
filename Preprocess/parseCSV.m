@@ -8,7 +8,7 @@ switch nargin
         csvfilename = [];
         outfilename = [];
     case 1
-        oufilename = [];        
+        outfilename = [];        
 end
 
 wd = pwd;
