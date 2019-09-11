@@ -54,6 +54,10 @@ function [p,q] = distLin(DCI0,DCI1)
         else
             p = mod(normDCI0*pi/2, 2*pi);
         end
-    end    
+    end   
+    if isa(DCI0, 'single')
+        p = single(p);
+        q = single(q);
+    end
 end
 

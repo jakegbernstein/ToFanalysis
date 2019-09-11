@@ -12,10 +12,13 @@ function [frame, files] = processFrame(frame, files)
 IMAGESIZE=[240,320];
 
 inds = frame.fileinds; 
-%NOTE - vector transposed to make 1xN array
 if size(inds,1) > 1
     inds = inds';
 end
+inds_3D = inds([files(inds).mode] == 1);
+inds_2D = inds([files(inds).mode] == 0);
+%NOTE - vector transposed to make 1xN array
+
 %Catch different field tags for the camera
 if isfield(files(inds(1)),'cams')
     cams = unique([files(inds).cams]);
@@ -24,8 +27,9 @@ elseif isfield(files(inds(1)),'Camera')
 else
     error('No cams or Camera field')
 end
-    
-for i = inds
+
+%Process 3D images
+for i = inds_3D
     if files(i).piDelay
         tmpDCSperimage = 4;
     else
@@ -49,6 +53,12 @@ if strcmpi(frame.type,'average')
     frame.phases =    mean(reshape([files(inds).phases],   IMAGESIZE(1),IMAGESIZE(2),[]),3);
     frame.frequency = files(inds(1)).frequency;
 end
+
+for i = inds_2D
+    %Load in grayscale images...
+    %WRITE THIS LATER
+end
+    
 
 %This is for merging together a single frame w/ two cameras
 if strcmpi(frame.type,'single') && (length(unique([files(frame.inds).cams])) > 1)
