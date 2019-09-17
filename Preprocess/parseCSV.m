@@ -42,11 +42,25 @@ for i = 1:size(T,1)
     files(i) = table2struct(T(i,:));
 end
 
+%Convert Time to matlab datenum
+for i=1:length(files)
+    YMDpos = 6:11; %HACK!!!
+    %MORE HACK
+    timestr = num2str(files(i).Time);
+    if strfind(timestr,'.') == 6
+        timestr = ['0',timestr];
+    end
+    dstr = [files(i).Filename(YMDpos),timestr];
+    files(i).Time = datenum(dstr,'yymmddHHMMSS.FFF');
+end
+
+
 %Create the 'frames' array
 frameinds = unique(T.(frameheader))';
 for i = frameinds
     frames(i).fileinds = find(T.(frameheader) == i);
     frames(i).RefractiveIndex = files(frames(i).fileinds(1)).RefractiveIndex;
+    frames(i).vidnum = files(frames(i).fileinds(1)).vidnum;
     %Workaround for csv files created with now frame tage
     if find(contains(T.Properties.VariableNames,'frametag'))
         frames(i).type = T{frames(i).fileinds(1),'frametag'}{1};
@@ -60,6 +74,7 @@ for i = frameinds
         end
     end        
 end
+
 
 %Create the 'movies' array
 movieinds = unique(T.(vidheader))';
