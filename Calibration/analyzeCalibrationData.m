@@ -9,7 +9,7 @@ SPEEDOFLIGHT=3E8;
 NUMDLL=50;
 
 %Process inputs
-calibration=struct();
+calibration=struct('phase',[]);
 wd = pwd;
 switch nargin
     case 0
@@ -53,7 +53,9 @@ title('epc660 average temperature')
 useframes = input('Which frames should be used for calibration?\n');
 
 %% Load data; Average DCS values of each dll step
+fprintf('Loading data\n')
 tic
+flatimage(NUMDLL) = struct('DCS',[],'meanDCS1',[],'meanDCS2',[],'meanDCS3',[],'meanDCS4',[],'phase',[],'meanphase',[]);
 for i=1:NUMDLL
     flatimage(i).DCS = zeros([IMAGESIZE, DCSPERIMAGE]);
     for f = 1:length(useframes)
@@ -91,18 +93,37 @@ xlabel('dll step')
 ylabel('Mean phase')
 
 %% Calculate phase of each pixel for each averaged dll step
+fprintf('Calculating phase of each pixel\n')
+tic
 for i=1:NUMDLL
     flatimage(i).phase = atan((flatimage(i).DCS(:,:,2)-flatimage(i).DCS(:,:,4))./(flatimage(i).DCS(:,:,1)-flatimage(i).DCS(:,:,3)));
     pishiftinds = find(flatimage(i).DCS(:,:,1) - flatimage(i).DCS(:,:,3) > 0 );
     flatimage(i).phase(pishiftinds) = flatimage(i).phase(pishiftinds) + pi;
     flatimage(i).meanphase = mean2(flatimage(i).phase);
 end  
+toc
+
+%% Build calibrationmatrix
+calibration.phase = reshape([flatimage.phase],[IMAGESIZE, NUMDLL]);
+figure
+plot(calibration.phase(1,1,:))
+hold on
 
 %% Make movie of flat field phase vs dll
-figure
-flatmovie = 
+flatfigure = figure;
+flatframes(NUMDLL) = struct('cdata',[],'colormap',[]);
+flatmovie = VideoWriter('flatframes.avi');
+flatmovie.open();
+for i=1:NUMDLL
+    imagesc(flatimage(i).phase)
+    colorbar
+    drawnow
+    flatframes(i) = getframe(flatfigure);
+    writeVideo(flatmovie, flatframes(i));
+end
 
-%% Calculate z-score of each pixel at each dll step
+%% Calculate phase std of each pixel at each dll step
+
 
 %% Make movie of flat field  z-score of each pixel vs dll
 
