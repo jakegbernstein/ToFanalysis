@@ -47,9 +47,13 @@ for i=1:length(files)
     YMDpos = 6:11; %HACK!!!
     %MORE HACK
     timestr = num2str(files(i).Time);
+    if isempty(strfind(timestr,'.'))
+        timestr = [timestr,'.000'];
+    end
     if strfind(timestr,'.') == 6
         timestr = ['0',timestr];
     end
+    
     dstr = [files(i).Filename(YMDpos),timestr];
     files(i).Time = datenum(dstr,'yymmddHHMMSS.FFF');
 end
