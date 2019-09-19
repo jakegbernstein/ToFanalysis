@@ -105,9 +105,12 @@ toc
 
 %% Build calibrationmatrix
 calibration.phase = reshape([flatimage.phase],[IMAGESIZE, NUMDLL]);
+phaseplot = reshape(permute(calibration.phase,[3,1,2]),NUMDLL,[]);
 figure
-plot(calibration.phase(1,1,:))
-hold on
+plot(phaseplot(:,1:10:end))
+xlabel('dll step')
+ylabel('phase')
+title('Pixel-by-Pixel Phase Calibration (1 of every 10 pixels)')
 
 %% Make movie of flat field phase vs dll
 flatfigure = figure;
