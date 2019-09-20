@@ -1,4 +1,4 @@
-function calibration = analyzeCalibrationData(metafilename)
+function calibration = analyzeCalibrationData(metafilename, debugmode)
 %Jacob Bernstein
 %Description
 
@@ -9,12 +9,19 @@ SPEEDOFLIGHT=3E8;
 NUMDLL=50;
 
 %Process inputs
-calibration=struct('phase',[]);
+calibration=struct('phase',[],'badpixels',[],'meantemperature',[],'goodpixels',[]);
 wd = pwd;
 switch nargin
     case 0
         [metafilename, metafilepath] = uigetfile('*.csv','Select metadata file');
         cd(metafilepath)
+        debugmode = false;
+    case 1
+        debugmode = false;
+end
+
+if debugmode
+    figure
 end
 
 [files, frames, movies] = parseCSV(metafilename);
@@ -51,23 +58,26 @@ ylabel('Temperature (C)')
 title('epc660 average temperature')
 
 useframes = input('Which frames should be used for calibration?\n');
+calibration.meantemperature = mean(movie.temps(useframes));
+
 
 %% Load data; Average DCS values of each dll step
 fprintf('Loading data\n')
 tic
-flatimage(NUMDLL) = struct('DCS',[],'meanDCS1',[],'meanDCS2',[],'meanDCS3',[],'meanDCS4',[],'phase',[],'meanphase',[]);
+flatimage(NUMDLL) = struct('allDCS',[],'meanDCS',[],'meanDCS1',[],'meanDCS2',[],'meanDCS3',[],'meanDCS4',[],'phase',[],'meanphase',[]);
 for i=1:NUMDLL
-    flatimage(i).DCS = zeros([IMAGESIZE, DCSPERIMAGE]);
+    flatimage(i).meanDCS = zeros([IMAGESIZE, DCSPERIMAGE],'single');
+    flatimage(i).allDCS = zeros([IMAGESIZE, DCSPERIMAGE, length(useframes)], 'single');
     for f = 1:length(useframes)
         filenum = frames(useframes(f)).fileinds(i);
-        files(filenum).DCS = readbin(files(filenum).Filename, IMAGESIZE, DCSPERIMAGE);
-        flatimage(i).DCS = flatimage(i).DCS + files(filenum).DCS;
+        flatimage(i).allDCS(:,:,:,f) = readbin(files(filenum).Filename, IMAGESIZE, DCSPERIMAGE);
     end
-    flatimage(i).DCS = flatimage(i).DCS/length(useframes);
-    flatimage(i).meanDCS1 = mean2(squeeze(flatimage(i).DCS(:,:,1)));
-    flatimage(i).meanDCS2 = mean2(squeeze(flatimage(i).DCS(:,:,2)));
-    flatimage(i).meanDCS3 = mean2(squeeze(flatimage(i).DCS(:,:,3)));
-    flatimage(i).meanDCS4 = mean2(squeeze(flatimage(i).DCS(:,:,4)));
+    flatimage(i).meanDCS = mean(flatimage(i).allDCS,4);
+    flatimage(i).meanDCS1 = mean2(squeeze(flatimage(i).meanDCS(:,:,1)));
+    flatimage(i).meanDCS2 = mean2(squeeze(flatimage(i).meanDCS(:,:,2)));
+    flatimage(i).meanDCS3 = mean2(squeeze(flatimage(i).meanDCS(:,:,3)));
+    flatimage(i).meanDCS4 = mean2(squeeze(flatimage(i).meanDCS(:,:,4)));
+    toc
 end
 toc
 
@@ -96,16 +106,34 @@ ylabel('Mean phase')
 fprintf('Calculating phase of each pixel\n')
 tic
 for i=1:NUMDLL
-    flatimage(i).phase = atan((flatimage(i).DCS(:,:,2)-flatimage(i).DCS(:,:,4))./(flatimage(i).DCS(:,:,1)-flatimage(i).DCS(:,:,3)));
-    pishiftinds = find(flatimage(i).DCS(:,:,1) - flatimage(i).DCS(:,:,3) > 0 );
+    flatimage(i).phase = atan((flatimage(i).meanDCS(:,:,2)-flatimage(i).meanDCS(:,:,4))./(flatimage(i).meanDCS(:,:,1)-flatimage(i).meanDCS(:,:,3)));
+    pishiftinds = find(flatimage(i).meanDCS(:,:,1) - flatimage(i).meanDCS(:,:,3) >= 0 );
     flatimage(i).phase(pishiftinds) = flatimage(i).phase(pishiftinds) + pi;
     flatimage(i).meanphase = mean2(flatimage(i).phase);
+      
 end  
 toc
 
+
 %% Build calibrationmatrix
 calibration.phase = reshape([flatimage.phase],[IMAGESIZE, NUMDLL]);
+calibration.badpixels = [];
+calibration.goodpixels = ones(IMAGESIZE);
+for i=1:IMAGESIZE(1)
+    for j=1:IMAGESIZE(2)
+        tmpcal = squeeze(calibration.phase(i,j,:));
+        tmppiv = find(diff(tmpcal) <= 0);
+        if length(tmppiv) > 1
+            calibration.badpixels(:,end+1) = [i; j];
+            calibration.goodpixels(i,j) = 0;
+        else
+            tmpcal(tmppiv+1:end) = tmpcal(tmppiv+1:end) + 2*pi;
+            calibration.phase(i,j,:) = tmpcal;
+        end
+    end
+end
 phaseplot = reshape(permute(calibration.phase,[3,1,2]),NUMDLL,[]);
+
 figure
 plot(phaseplot(:,1:10:end))
 xlabel('dll step')
@@ -126,6 +154,7 @@ for i=1:NUMDLL
 end
 
 %% Calculate phase std of each pixel at each dll step
+rawphases = zeros([IMAGESIZE, length(useframes)]);
 
 
 %% Make movie of flat field  z-score of each pixel vs dll
