@@ -10,7 +10,8 @@ function [frame, files] = processFrame(frame, files, inds, TIMEDELAY)
 %%%  .qualities
 
 IMAGESIZE=[240,320];
-
+saveDCS = false;
+load Calibration
 
 %NOTE - vector transposed to make 1xN array
 switch nargin
@@ -33,34 +34,50 @@ elseif isfield(files(inds(1)),'Camera')
 else
     error('No cams or Camera field')
 end
-    
-for i = inds
-    if files(i).piDelay
-        tmpDCSperimage = 4;
-    else
-        tmpDCSperimage = 2;
-    end
-    if isfield(files(i),'filename')
-        tmpfilename = files(i).filename;
-    else
-        tmpfilename = files(i).Filename;
-    end
-    files(i).DCS = readbin(tmpfilename,IMAGESIZE,tmpDCSperimage);
-    [files(i).distances, files(i).qualities, files(i).phases] = DCItoDistance_Linear(files(i),[],TIMEDELAY);
-    %files(i).distances = files(i).distances;
-    %files(i).qualities = files(i).qualities;
-    %files(i).phases =    files(i).phases;
-end 
 
-if strcmpi(frame.type,'average')
-    frame.distances = mean(reshape([files(inds).distances],IMAGESIZE(1),IMAGESIZE(2),[]),3);
-    frame.qualities = mean(reshape([files(inds).qualities],IMAGESIZE(1),IMAGESIZE(2),[]),3);
-    frame.phases =    mean(reshape([files(inds).phases],   IMAGESIZE(1),IMAGESIZE(2),[]),3);
-    frame.frequency = files(inds(1)).frequency;
+if files(inds(1)).piDelay
+    DCSperimage = 4;
+else
+    DCSperimage = 2;
 end
 
+%Pre-allocate image data storage
+if saveDCS
+    frame.DCS = zeros(IMAGESIZE(1),IMAGESIZE(2),DCSperimage,length(inds),'single');
+end
+frame.distances = zeros(IMAGESIZE(1),IMAGESIZE(2),length(inds),'single');
+frame.qualities = zeros(IMAGESIZE(1),IMAGESIZE(2),length(inds),'single');
+frame.phases = zeros(IMAGESIZE(1),IMAGESIZE(2),length(inds),'single');
+
+for i = 1:length(inds)
+    if isfield(files(inds(i)),'filename')
+        tmpfilename = files(inds(i)).filename;
+    else
+        tmpfilename = files(inds(i)).Filename;
+    end
+    tempDCS = readbin(tmpfilename,IMAGESIZE,DCSperimage);
+    if saveDCS
+        frame.DCS(:,:,:,i) = tempDCS;
+    end
+    %[files(i).distances, files(i).qualities, files(i).phases] = DCItoDistance_Linear(files(i),[],TIMEDELAY);
+    
+    [tmpdistances, tmpqualities, tmpphases] = calPhaseInterp(tempDCS, calibration);
+    %tmpphases = calPhaseInterp(tempDCS, calibration);
+    frame.distances(:,:,i) = tmpdistances;
+    frame.qualities(:,:,i) = tmpqualities;
+    frame.phases(:,:,1)    = tmpphases;
+    
+end 
+
+% if strcmpi(frame.type,'average')
+%     frame.distances = mean(reshape([files(inds).distances],IMAGESIZE(1),IMAGESIZE(2),[]),3);
+%     frame.qualities = mean(reshape([files(inds).qualities],IMAGESIZE(1),IMAGESIZE(2),[]),3);
+%     frame.phases =    mean(reshape([files(inds).phases],   IMAGESIZE(1),IMAGESIZE(2),[]),3);
+%     frame.frequency = files(inds(1)).frequency;
+% end
+
 %This is for merging together a single frame w/ two cameras
-if strcmpi(frame.type,'single') && (length(unique([files(frame.inds).cams])) > 1)
+if strcmpi(frame.type,'single') && (length(unique([files(frame.fileinds).Camera])) > 1)
 
 end
 

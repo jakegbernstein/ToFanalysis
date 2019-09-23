@@ -1,25 +1,38 @@
-function delay = calPhaseInterp(DCS, caldata, goodpixels)
+function [distance, quality, calphase] = calPhaseInterp(DCS, calibration)
+%function delay = calPhaseInterp(DCS, caldata, goodpixels)
 
+%0: 
+C = 3e8;
+period = 1/calibration.modfreq; 
+phasestep = (1e-9*calibration.dllstep)/period;
+phaseoffset = (2*calibration.targetdistance/(C))/period;
+wavelength = C*period/2;
 
 %1: Measure phase
-phase = atan((DCS(:,:,2)-DCS(:,:,4))./(DCS(:,:,1)-DCS(:,:,3)));
+calphase = atan((DCS(:,:,2)-DCS(:,:,4))./(DCS(:,:,1)-DCS(:,:,3)));
 pishiftinds = find((DCS(:,:,1)-DCS(:,:,3)) >= 0);
-phase(pishiftinds) = phase(pishiftinds) + pi;
+calphase(pishiftinds) = calphase(pishiftinds) + pi;
 
-naninds = find(isnan(phase));
-goodpixels(naninds) = 0;
+naninds = find(isnan(calphase));
+calibration.goodpixels(naninds) = 0;
 
-test = permute(caldata,[3 1 2]);
+phasecal = permute(calibration.phase,[3 1 2]);
 
 %2: Interpolate back to dll
 tic
-delay = zeros(size(DCS,1),size(DCS,2));
+phase = zeros(size(DCS,1),size(DCS,2),'single');
+quality = zeros(size(DCS,1),size(DCS,2),'single');
+distance = zeros(size(DCS,1),size(DCS,2),'single');
+
 badpixels = [];
 for i=1:size(DCS,1)
     %for j=1:size(DCS,2)
-    for j=find(goodpixels(i,:))
+    for j=find(calibration.goodpixels(i,:))
         %delay(i,j) = reverseinterp(phase(i,j), squeeze(caldata(i,j,:)));
-        delay(i,j) = reverseinterp(phase(i,j), test(:,i,j));
+        tmpdelay = reverseinterp(calphase(i,j), phasecal(:,i,j));
+        phase(i,j) = mod(phaseoffset + tmpdelay*phasestep,1);
+        distance(i,j) = wavelength*phase(i,j);
+        quality(i,j) = sqrt(sum(DCS(i,j,:).^2));
     end
 end
 toc

@@ -1,4 +1,4 @@
-function calibration = analyzeCalibrationData(metafilename, debugmode)
+function calibration = analyzeCalibrationData(metafilename, inparams)
 %Jacob Bernstein
 %Description
 
@@ -9,20 +9,43 @@ SPEEDOFLIGHT=3E8;
 NUMDLL=50;
 
 %Process inputs
-calibration=struct('phase',[],'badpixels',[],'meantemperature',[],'goodpixels',[]);
+calibration=struct('phase',[],'badpixels',[],'meantemperature',[],'goodpixels',[],'targetdistance',[],'dllstep',[]);
 wd = pwd;
 switch nargin
     case 0
         [metafilename, metafilepath] = uigetfile('*.csv','Select metadata file');
         cd(metafilepath)
-        debugmode = false;
+        inparams = [];
     case 1
-        debugmode = false;
+        inparams = [];
 end
 
-if debugmode
+%Take care of input parameters
+if isempty(inparams)
+    inparams = struct();
+end
+
+if ~isfield(inparams,'debugmode') || isempty(inparams.debugmode)
+    inparams.debugmode = false;
+end   
+
+if ~isfield(inparams,'targetdistance') || isempty(inparams.targetdistance)
+    inparams.targetdistance = input('Input target distance in meters: \n');
+end
+
+if ~isfield(inparams,'dllstep') || isempty(inparams.dllstep)
+    inparams.dllstep = input('Input dll step in nanoseconds: \n');
+end
+
+%
+if inparams.debugmode
     figure
 end
+
+calibration.targetdistance = inparams.targetdistance;
+calibration.dllstep = inparams.dllstep;
+wdparts = split(pwd,filesep);
+calibration.dataset = wdparts{end};
 
 [files, frames, movies] = parseCSV(metafilename);
 if length(movies) > 1
