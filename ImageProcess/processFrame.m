@@ -1,4 +1,4 @@
-function [frame, files] = processFrame(frame, files, inds, TIMEDELAY)
+function [frame, files] = processFrame(frame, files, inds, saveDCS)
 
 %frame structure
 %%% Input 
@@ -10,19 +10,22 @@ function [frame, files] = processFrame(frame, files, inds, TIMEDELAY)
 %%%  .qualities
 
 IMAGESIZE=[240,320];
-saveDCS = false;
 load Calibration
+
 
 %NOTE - vector transposed to make 1xN array
 switch nargin
     case 2
-        inds = frame.fileinds; 
-        TIMEDELAY = [];
+        inds = [];
+        saveDCS = false;
     case 3
-        TIMEDELAY = [];
+        saveDCS =false;
 end
         
-        
+if isempty(inds)
+    inds = frame.fileinds; 
+end
+
 if size(inds,1) > 1
     inds = inds';
 end
@@ -41,32 +44,59 @@ else
     DCSperimage = 2;
 end
 
-%Pre-allocate image data storage
-if saveDCS
-    frame.DCS = zeros(IMAGESIZE(1),IMAGESIZE(2),DCSperimage,length(inds),'single');
-end
-frame.distances = zeros(IMAGESIZE(1),IMAGESIZE(2),length(inds),'single');
-frame.qualities = zeros(IMAGESIZE(1),IMAGESIZE(2),length(inds),'single');
-frame.phases = zeros(IMAGESIZE(1),IMAGESIZE(2),length(inds),'single');
+%Count number of grayscale and DCS images; Pre-allocate image data storage
+framemodes = [files(frame.fileinds).mode];
+numgrayscale = length(find(framemodes == 0));
+numDCS = length(find(framemodes == 1));
+inds_grayscale = find(framemodes == 0);
+inds_DCS = find(framemodes == 1);
 
-for i = 1:length(inds)
-    if isfield(files(inds(i)),'filename')
-        tmpfilename = files(inds(i)).filename;
-    else
-        tmpfilename = files(inds(i)).Filename;
+if numDCS > 0
+    frame.hasDistance = 1;
+    if saveDCS
+        frame.DCS = zeros(IMAGESIZE(1),IMAGESIZE(2),DCSperimage,numDCS,'single');
     end
+    frame.distances = zeros(IMAGESIZE(1),IMAGESIZE(2),numDCS,'single');
+    frame.qualities = zeros(IMAGESIZE(1),IMAGESIZE(2),numDCS,'single');
+    frame.phases = zeros(IMAGESIZE(1),IMAGESIZE(2),numDCS,'single');
+else
+    frame.hasDistance = 0;
+end
+
+if numgrayscale > 0
+    frame.hasGrayscale = 1;
+    frame.grayscale = zeros(IMAGESIZE(1),IMAGESIZE(2),numgrayscale);
+else
+    frame.hasGrayscale = 0;
+end
+
+%Process DCS images
+for i = 1:length(inds_DCS)
+    if isfield(files(inds(inds_DCS(i))),'filename')
+        tmpfilename = files(inds(inds_DCS(i))).filename;
+    else
+        tmpfilename = files(inds(inds_DCS(i))).Filename;
+    end         
     tempDCS = readbin(tmpfilename,IMAGESIZE,DCSperimage);
     if saveDCS
         frame.DCS(:,:,:,i) = tempDCS;
     end
     %[files(i).distances, files(i).qualities, files(i).phases] = DCItoDistance_Linear(files(i),[],TIMEDELAY);
-    
     [tmpdistances, tmpqualities, tmpphases] = calPhaseInterp(tempDCS, calibration);
     %tmpphases = calPhaseInterp(tempDCS, calibration);
     frame.distances(:,:,i) = tmpdistances;
     frame.qualities(:,:,i) = tmpqualities;
-    frame.phases(:,:,1)    = tmpphases;
-    
+    frame.phases(:,:,1)    = tmpphases;    
+end 
+
+%Proces Grayscale images
+for i = 1:length(inds_grayscale)
+    if isfield(files(inds(inds_grayscale(i))),'filename')
+        tmpfilename = files(inds(inds_grayscale(i))).filename;
+    else
+        tmpfilename = files(inds(inds_grayscale(i))).Filename;
+    end         
+    frame.grayscale = readbin(tmpfilename,IMAGESIZE,1);
 end 
 
 % if strcmpi(frame.type,'average')

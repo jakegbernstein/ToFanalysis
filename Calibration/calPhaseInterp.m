@@ -1,12 +1,31 @@
-function [distance, quality, calphase] = calPhaseInterp(DCS, calibration)
+function [distance, quality, calphase] = calPhaseInterp(DCS, calibration, params)
 %function delay = calPhaseInterp(DCS, caldata, goodpixels)
+
+switch nargin
+    case 2
+        params = [];
+end
+
+if ~isfield(params,'LEDoffset') || isempty(params.separation)
+    params.separation = 0;
+end
+
+if ~isfield(params,'focallength') || isempty(params.focallength)
+    params.focallength = 5.5; %mm
+end
+
+PIXELWIDTH = 0.020; %mm
+IMAGESIZE = [240,320];
+IMAGECENTER = (IMAGESIZE + [1,1])/2;
+
+delta = atan(PIXELWIDTH/params.focallength);
 
 %0: 
 C = 3e8;
 period = 1/calibration.modfreq; 
 phasestep = (1e-9*calibration.dllstep)/period;
 phaseoffset = (2*calibration.targetdistance/(C))/period;
-wavelength = C*period/2;
+wavelength = C*period;
 
 %1: Measure phase
 calphase = atan((DCS(:,:,2)-DCS(:,:,4))./(DCS(:,:,1)-DCS(:,:,3)));
@@ -31,7 +50,14 @@ for i=1:size(DCS,1)
         %delay(i,j) = reverseinterp(phase(i,j), squeeze(caldata(i,j,:)));
         tmpdelay = reverseinterp(calphase(i,j), phasecal(:,i,j));
         phase(i,j) = mod(phaseoffset + tmpdelay*phasestep,1);
-        distance(i,j) = wavelength*phase(i,j);
+        if params.separation == 0
+            distance(i,j) = wavelength*phase(i,j)/2;
+        else
+            D = wavelength*phase(i,j);
+            offcenter = i - IMAGECENTER(1);
+            decl = delta*offcenter;
+            distance(i,j) = (D^2 - params.LEDoffset^2)/(2*(D-params.LEDoffset(sin(decl))));
+        end
         quality(i,j) = sqrt(sum(DCS(i,j,:).^2));
     end
 end
