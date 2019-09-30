@@ -33,7 +33,8 @@ n = 1;
 for i = 1:size(datstruct.distances,1)
     for j = 1:size(datstruct.distances, 2)
         if datstruct.qualities(i,j) > params.minqual
-            xyz(n,:) = pixel2xyzLEDoffset([i,j],datstruct.distances(i,j) + params.offset);
+            %xyz(n,:) = pixel2xyzLEDoffset([i,j],datstruct.distances(i,j) + params.offset);
+            xyz(n,:) = pixel2xyz([i,j],datstruct.distances(i,j) + params.offset);
             n = n+1;
         end
     end

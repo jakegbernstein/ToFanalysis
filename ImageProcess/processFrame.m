@@ -11,7 +11,7 @@ function [frame, files] = processFrame(frame, files, inds, saveDCS)
 
 IMAGESIZE=[240,320];
 load Calibration
-
+calparams = struct('LEDoffset', 8.5*.0254);
 
 %NOTE - vector transposed to make 1xN array
 switch nargin
@@ -82,7 +82,7 @@ for i = 1:length(inds_DCS)
         frame.DCS(:,:,:,i) = tempDCS;
     end
     %[files(i).distances, files(i).qualities, files(i).phases] = DCItoDistance_Linear(files(i),[],TIMEDELAY);
-    [tmpdistances, tmpqualities, tmpphases] = calPhaseInterp(tempDCS, calibration);
+    [tmpdistances, tmpqualities, tmpphases] = calPhaseInterp(tempDCS, calibration, calparams);
     %tmpphases = calPhaseInterp(tempDCS, calibration);
     frame.distances(:,:,i) = tmpdistances;
     frame.qualities(:,:,i) = tmpqualities;

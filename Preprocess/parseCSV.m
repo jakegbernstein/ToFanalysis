@@ -40,6 +40,10 @@ end
 %Create the 'files' array
 for i = 1:size(T,1)
     files(i) = table2struct(T(i,:));
+    %Check if Temperature is a string
+    if isstr(files(i).Temp)
+        files(i).Temp = str2num(strtok(files(i).Temp,'[]'));
+    end
 end
 
 %Convert Time to matlab datenum

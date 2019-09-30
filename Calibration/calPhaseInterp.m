@@ -6,7 +6,7 @@ switch nargin
         params = [];
 end
 
-if ~isfield(params,'LEDoffset') || isempty(params.separation)
+if ~isfield(params,'LEDoffset') || isempty(params.LEDoffset)
     params.separation = 0;
 end
 
@@ -38,7 +38,6 @@ calibration.goodpixels(naninds) = 0;
 phasecal = permute(calibration.phase,[3 1 2]);
 
 %2: Interpolate back to dll
-tic
 phase = zeros(size(DCS,1),size(DCS,2),'single');
 quality = zeros(size(DCS,1),size(DCS,2),'single');
 distance = zeros(size(DCS,1),size(DCS,2),'single');
@@ -50,18 +49,17 @@ for i=1:size(DCS,1)
         %delay(i,j) = reverseinterp(phase(i,j), squeeze(caldata(i,j,:)));
         tmpdelay = reverseinterp(calphase(i,j), phasecal(:,i,j));
         phase(i,j) = mod(phaseoffset + tmpdelay*phasestep,1);
-        if params.separation == 0
+        if params.LEDoffset == 0
             distance(i,j) = wavelength*phase(i,j)/2;
         else
             D = wavelength*phase(i,j);
             offcenter = i - IMAGECENTER(1);
             decl = delta*offcenter;
-            distance(i,j) = (D^2 - params.LEDoffset^2)/(2*(D-params.LEDoffset(sin(decl))));
+            distance(i,j) = (D^2 - params.LEDoffset^2)/(2*(D-params.LEDoffset*(sin(decl))));
         end
         quality(i,j) = sqrt(sum(DCS(i,j,:).^2));
     end
 end
-toc
 
 end
 

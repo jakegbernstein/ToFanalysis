@@ -16,14 +16,21 @@ function [DCS, satpixels] = readbin(filename,imagesize,DCSperimage,satpixelthres
     if isempty(satpixelthreshold)
         satpixelthreshold = 2000;
 
-    %Check if filename has .bin ending
-    [~,filestem] = fileparts(filename);
-    filename = [filestem,'.bin'];
-    tmpfiles = dir;
-    if find(contains({tmpfiles.name},filename))
-        fid = fopen(filename);
-    else
-        fid = fopen(['./images/',filename]);
+    %Check for file along search path
+    searchpath = {'./', './images/'};
+    filefound = 0;
+    i = 1;
+    while ~filefound
+        foundfiles = dir([searchpath{i},filename,'*']);
+        if length(foundfiles) == 0
+            i = i+1;
+        elseif length(foundfiles) == 1
+            filefound = true;
+            fid = fopen([searchpath{i},foundfiles.name]);
+        else
+            %%%CAN FIX THIS LATER
+            error('Found multiple matching files')
+        end
     end
     tmprawdat = fread(fid,Inf,'uint16');    
     tmprawdat = single(tmprawdat - 2^11);
