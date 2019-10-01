@@ -47,41 +47,49 @@ calibration.dllstep = inparams.dllstep;
 wdparts = split(pwd,filesep);
 calibration.dataset = wdparts{end};
 
-[files, frames, movies] = parseCSV(metafilename);
-if length(movies) > 1
-    movieind = input('Which movie to analyze?\n');
-else
-    movieind = 1;
-end
-movie = movies(1);
-
 %% Plot Temperature over calibration capture
-firstframe = movie.frameinds(1);
-%NOTE: It looks like the csv reader works differently on linux vs pc!
-if isstr(files(1).Temp)
-    tempimage = find(~cellfun('isempty',strfind({files([frames(firstframe).fileinds]).measureTemp},'TRUE')));
-    for i=1:length(movie.frameinds)
-        frames(movie.frameinds(i)).Temp = files(frames(movie.frameinds(i)).fileinds(tempimage)).Temp;
-        movie.temps(i) = str2num(frames(movie.frameinds(i)).Temp);
+[files, frames, movies] = parseCSV(metafilename);
+movieind = input('Which movie to analyze? (-1 for all frames)\n');
+if movieind == -1
+    %NOTE: THIS CODE IS HACKY AND COULD BREAK DEPENDING ON HOW METADATA IS PARSED AND HOW MANY TEMPERATURE MEASUREMENTS ARE MADE PER FRAME 
+    temps = [files.Temp];
+    fig_temp = figure;
+    plot(temps)
+    xlabel('Frame Number')
+    ylabel('Temperature (C)')
+    title('epc660 average temperature')   
+    useframes = input('Which frames should be used for calibration?\n');
+    calibration.meantemperature = mean(temps(useframes));
+else   
+    movie = movies(movieind);
+    firstframe = movie.frameinds(1);
+    %NOTE: It looks like the csv reader works differently on linux vs pc!
+    if isstr(files(1).Temp)
+        tempimage = find(~cellfun('isempty',strfind({files([frames(firstframe).fileinds]).measureTemp},'TRUE')));
+        for i=1:length(movie.frameinds)
+            frames(movie.frameinds(i)).Temp = files(frames(movie.frameinds(i)).fileinds(tempimage)).Temp;
+            movie.temps(i) = str2num(frames(movie.frameinds(i)).Temp);
+        end
+    elseif isnumeric(files(1).Temp)
+        tempimage = find(~isnan([files([frames(firstframe).fileinds]).Temp]));
+        for i=1:length(movie.frameinds)
+            frames(movie.frameinds(i)).Temp = files([frames(movie.frameinds(i)).fileinds(tempimage)]).Temp;
+            movie.temps(i) = frames(movie.frameinds(i)).Temp;
+        end
+    else
+        error('WTF is going on w/ Temp metadata?')
     end
-elseif isnumeric(files(1).Temp)
-    tempimage = find(~isnan([files([frames(firstframe).fileinds]).Temp]));
-    for i=1:length(movie.frameinds)
-        frames(movie.frameinds(i)).Temp = files([frames(movie.frameinds(i)).fileinds(tempimage)]).Temp;
-        movie.temps(i) = frames(movie.frameinds(i)).Temp;
-    end
-else
-    error('WTF is going on w/ Temp metadata?')
+    
+    fig_temp = figure;
+    plot(movie.temps)
+    xlabel('Frame Number')
+    ylabel('Temperature (C)')
+    title('epc660 average temperature')
+    
+    useframes = input('Which frames should be used for calibration?\n');
+    calibration.meantemperature = mean(movie.temps(useframes));
 end
 
-fig_temp = figure;
-plot(movie.temps)
-xlabel('Frame Number')
-ylabel('Temperature (C)')
-title('epc660 average temperature')
-
-useframes = input('Which frames should be used for calibration?\n');
-calibration.meantemperature = mean(movie.temps(useframes));
 
 
 %% Load data; Average DCS values of each dll step
@@ -186,6 +194,7 @@ rawphases = zeros([IMAGESIZE, length(useframes)]);
 
 
 
-
+calibration.modfreq = files(frames(useframes(1)).fileinds(1)).frequency;
+calibration.frequency = calibration.modfreq;
 save('Calibration','calibration')
 cd(wd)

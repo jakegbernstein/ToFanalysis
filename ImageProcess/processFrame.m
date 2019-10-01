@@ -1,4 +1,4 @@
-function [frame, files] = processFrame(frame, files, inds, saveDCS)
+function [frame, files] = processFrame(frame, files, inds, saveDCS, calibrationfile)
 
 %frame structure
 %%% Input 
@@ -9,8 +9,16 @@ function [frame, files] = processFrame(frame, files, inds, saveDCS)
 %%%  .distances
 %%%  .qualities
 
+switch nargin
+    case 4
+        calibrationfile = [];
+end
+if isempty(calibrationfile)
+    calibrationfile = "Calibration44C.mat";
+end
+
 IMAGESIZE=[240,320];
-load Calibration
+load(calibrationfile);
 calparams = struct('LEDoffset', 8.5*.0254);
 
 %NOTE - vector transposed to make 1xN array
