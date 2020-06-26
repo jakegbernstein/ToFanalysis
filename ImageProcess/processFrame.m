@@ -14,7 +14,7 @@ switch nargin
         calibrationfile = [];
 end
 if isempty(calibrationfile)
-    calibrationfile = "Calibration44C.mat";
+    calibrationfile = "Calibration38C.mat";
 end
 
 IMAGESIZE=[240,320];

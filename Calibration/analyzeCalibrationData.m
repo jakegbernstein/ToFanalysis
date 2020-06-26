@@ -37,6 +37,10 @@ if ~isfield(inparams,'dllstep') || isempty(inparams.dllstep)
     inparams.dllstep = input('Input dll step in nanoseconds: \n');
 end
 
+if ~isfield(inparams,'useframes')
+    inparams.useframes = [];
+end
+
 %
 if inparams.debugmode
     figure
@@ -48,46 +52,55 @@ wdparts = split(pwd,filesep);
 calibration.dataset = wdparts{end};
 
 %% Plot Temperature over calibration capture
+
 [files, frames, movies] = parseCSV(metafilename);
-movieind = input('Which movie to analyze? (-1 for all frames)\n');
-if movieind == -1
-    %NOTE: THIS CODE IS HACKY AND COULD BREAK DEPENDING ON HOW METADATA IS PARSED AND HOW MANY TEMPERATURE MEASUREMENTS ARE MADE PER FRAME 
-    temps = [files.Temp];
-    fig_temp = figure;
-    plot(temps)
-    xlabel('Frame Number')
-    ylabel('Temperature (C)')
-    title('epc660 average temperature')   
-    useframes = input('Which frames should be used for calibration?\n');
-    calibration.meantemperature = mean(temps(useframes));
-else   
-    movie = movies(movieind);
-    firstframe = movie.frameinds(1);
-    %NOTE: It looks like the csv reader works differently on linux vs pc!
-    if isstr(files(1).Temp)
-        tempimage = find(~cellfun('isempty',strfind({files([frames(firstframe).fileinds]).measureTemp},'TRUE')));
-        for i=1:length(movie.frameinds)
-            frames(movie.frameinds(i)).Temp = files(frames(movie.frameinds(i)).fileinds(tempimage)).Temp;
-            movie.temps(i) = str2num(frames(movie.frameinds(i)).Temp);
-        end
-    elseif isnumeric(files(1).Temp)
-        tempimage = find(~isnan([files([frames(firstframe).fileinds]).Temp]));
-        for i=1:length(movie.frameinds)
-            frames(movie.frameinds(i)).Temp = files([frames(movie.frameinds(i)).fileinds(tempimage)]).Temp;
-            movie.temps(i) = frames(movie.frameinds(i)).Temp;
-        end
-    else
-        error('WTF is going on w/ Temp metadata?')
+if ~isempty(inparams.useframes)
+    useframes = inparams.useframes;
+    for i=useframes
+        frames(i).Temp = [files([frames(i).fileinds]).Temp];
     end
-    
-    fig_temp = figure;
-    plot(movie.temps)
-    xlabel('Frame Number')
-    ylabel('Temperature (C)')
-    title('epc660 average temperature')
-    
-    useframes = input('Which frames should be used for calibration?\n');
-    calibration.meantemperature = mean(movie.temps(useframes));
+    calibration.meantemperature = mean([frames(useframes).Temp]);
+else
+    movieind = input('Which movie to analyze? (-1 for all frames)\n');
+    if movieind == -1
+        %NOTE: THIS CODE IS HACKY AND COULD BREAK DEPENDING ON HOW METADATA IS PARSED AND HOW MANY TEMPERATURE MEASUREMENTS ARE MADE PER FRAME
+        temps = [files.Temp];
+        fig_temp = figure;
+        plot(temps)
+        xlabel('Frame Number')
+        ylabel('Temperature (C)')
+        title('epc660 average temperature')
+        useframes = input('Which frames should be used for calibration?\n');
+        calibration.meantemperature = mean(temps(useframes));
+    else
+        movie = movies(movieind);
+        firstframe = movie.frameinds(1);
+        %NOTE: It looks like the csv reader works differently on linux vs pc!
+        if isstr(files(1).Temp)
+            tempimage = find(~cellfun('isempty',strfind({files([frames(firstframe).fileinds]).measureTemp},'TRUE')));
+            for i=1:length(movie.frameinds)
+                frames(movie.frameinds(i)).Temp = files(frames(movie.frameinds(i)).fileinds(tempimage)).Temp;
+                movie.temps(i) = str2num(frames(movie.frameinds(i)).Temp);
+            end
+        elseif isnumeric(files(1).Temp)
+            tempimage = find(~isnan([files([frames(firstframe).fileinds]).Temp]));
+            for i=1:length(movie.frameinds)
+                frames(movie.frameinds(i)).Temp = files([frames(movie.frameinds(i)).fileinds(tempimage)]).Temp;
+                movie.temps(i) = frames(movie.frameinds(i)).Temp;
+            end
+        else
+            error('WTF is going on w/ Temp metadata?')
+        end
+        
+        fig_temp = figure;
+        plot(movie.temps)
+        xlabel('Frame Number')
+        ylabel('Temperature (C)')
+        title('epc660 average temperature')
+        
+        useframes = input('Which frames should be used for calibration?\n');
+        calibration.meantemperature = mean(movie.temps(useframes));
+    end
 end
 
 
