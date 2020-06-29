@@ -1,4 +1,4 @@
-function calibration = analyzeCalibrationData(metafilename, inparams)
+function [calibration, flatimage] = analyzeCalibrationData(metafilename, inparams)
 %Jacob Bernstein
 %Description
 
@@ -41,6 +41,10 @@ if ~isfield(inparams,'useframes')
     inparams.useframes = [];
 end
 
+if ~isfield(inparams,'genfigures')
+    inparams.genfigures = {'pixel-by-pixel','temp','meanDCS','meanPhase','sampleimage','movie'};
+end
+
 %
 if inparams.debugmode
     figure
@@ -52,8 +56,12 @@ wdparts = split(pwd,filesep);
 calibration.dataset = wdparts{end};
 
 %% Plot Temperature over calibration capture
-
-[files, frames, movies] = parseCSV(metafilename);
+[~,~,filetype] = fileparts(metafilename);
+if isequal(filetype, '.mat')
+    load(metafilename);
+else
+    [files, frames, movies] = parseCSV(metafilename);
+end
 if ~isempty(inparams.useframes)
     useframes = inparams.useframes;
     for i=useframes
@@ -106,57 +114,75 @@ end
 
 
 %% Load data; Average DCS values of each dll step
-fprintf('Loading data\n')
+if inparams.debugmode
+    fprintf('Loading data\n')
+end
 tic
 flatimage(NUMDLL) = struct('allDCS',[],'meanDCS',[],'meanDCS1',[],'meanDCS2',[],'meanDCS3',[],'meanDCS4',[],'phase',[],'meanphase',[]);
 for i=1:NUMDLL
     flatimage(i).meanDCS = zeros([IMAGESIZE, DCSPERIMAGE],'single');
     flatimage(i).allDCS = zeros([IMAGESIZE, DCSPERIMAGE, length(useframes)], 'single');
+    flatimage(i).allquality = zeros([IMAGESIZE, length(useframes)]);
     for f = 1:length(useframes)
         filenum = frames(useframes(f)).fileinds(i);
         flatimage(i).allDCS(:,:,:,f) = readbin(files(filenum).Filename, IMAGESIZE, DCSPERIMAGE);
+        flatimage(i).allquality(:,:,f) = sqrt(sum(flatimage(i).allDCS(:,:,:,f).^2,3))/2;
     end
     flatimage(i).meanDCS = mean(flatimage(i).allDCS,4);
     flatimage(i).meanDCS1 = mean2(squeeze(flatimage(i).meanDCS(:,:,1)));
     flatimage(i).meanDCS2 = mean2(squeeze(flatimage(i).meanDCS(:,:,2)));
     flatimage(i).meanDCS3 = mean2(squeeze(flatimage(i).meanDCS(:,:,3)));
     flatimage(i).meanDCS4 = mean2(squeeze(flatimage(i).meanDCS(:,:,4)));
-    toc
+    flatimage(i).meanquality = mean(flatimage(i).allquality,'all');
+    flatimage(i).devquality = mean2(std(flatimage(i).allquality,0,3));
+    %toc
 end
-toc
+%toc
 
 meanphase = atan(([flatimage.meanDCS2] - [flatimage.meanDCS4]) ./ ([flatimage.meanDCS1] - [flatimage.meanDCS3]));
 pishiftinds = find([flatimage.meanDCS1] - [flatimage.meanDCS3] > 0);
 meanphase(pishiftinds) = meanphase(pishiftinds) + pi;
 
 %% Plot mean DCS values, phase
-figure
-subplot(2,1,1)
-plot([flatimage.meanDCS1])
-hold on
-plot([flatimage.meanDCS2])
-plot([flatimage.meanDCS3])
-plot([flatimage.meanDCS4])
-xlabel('dll step')
-ylabel('mean DCS value')
-legend('DCS0','DCS1','DCS2','DCS3')
-
-subplot(2,1,2)
-plot(meanphase)
-xlabel('dll step')
-ylabel('Mean phase')
+if ~isempty(find(strcmpi(inparams.genfigures,'meanDCS')))
+    figure
+    subplot(2,1,1)
+    plot([flatimage.meanDCS1])
+    hold on
+    plot([flatimage.meanDCS2])
+    plot([flatimage.meanDCS3])
+    plot([flatimage.meanDCS4])
+    xlabel('dll step')
+    ylabel('mean DCS value')
+    legend('DCS0','DCS1','DCS2','DCS3')
+    
+    subplot(2,1,2)
+    plot(meanphase)
+    xlabel('dll step')
+    ylabel('Mean phase')
+end
 
 %% Calculate phase of each pixel for each averaged dll step
-fprintf('Calculating phase of each pixel\n')
-tic
+if inparams.debugmode
+    fprintf('Calculating phase of each pixel\n')
+end
+%tic
+
 for i=1:NUMDLL
-    flatimage(i).phase = atan((flatimage(i).meanDCS(:,:,2)-flatimage(i).meanDCS(:,:,4))./(flatimage(i).meanDCS(:,:,1)-flatimage(i).meanDCS(:,:,3)));
+    flatimage(i).allphase = zeros([IMAGESIZE,1,size(flatimage(i).allDCS,4)]);
+    for j = 1:size(flatimage(i).allDCS,4)
+        %flatimage(i).phase = atan((flatimage(i).meanDCS(:,:,2)-flatimage(i).meanDCS(:,:,4))./(flatimage(i).meanDCS(:,:,1)-flatimage(i).meanDCS(:,:,3)));
+        flatimage(i).allphase(:,:,:,j) = atan((flatimage(i).allDCS(:,:,2,j)-flatimage(i).allDCS(:,:,4,j))./(flatimage(i).allDCS(:,:,1,j)-flatimage(i).allDCS(:,:,3,j)));               
+    end
+    flatimage(i).allphase = squeeze(flatimage(i).allphase);
+    flatimage(i).phase = mean(flatimage(i).allphase,3);
     pishiftinds = find(flatimage(i).meanDCS(:,:,1) - flatimage(i).meanDCS(:,:,3) >= 0 );
     flatimage(i).phase(pishiftinds) = flatimage(i).phase(pishiftinds) + pi;
     flatimage(i).meanphase = mean2(flatimage(i).phase);
-      
-end  
-toc
+    flatimage(i).devphase = mean2(std(flatimage(i).allphase,0,3));
+end
+
+%toc
 
 
 %% Build calibrationmatrix
@@ -178,23 +204,27 @@ for i=1:IMAGESIZE(1)
 end
 phaseplot = reshape(permute(calibration.phase,[3,1,2]),NUMDLL,[]);
 
-figure
-plot(phaseplot(:,1:10:end))
-xlabel('dll step')
-ylabel('phase')
-title('Pixel-by-Pixel Phase Calibration (1 of every 10 pixels)')
+if ~isempty(find(strcmpi(inparams.genfigures,'pixel-by-pixel')))
+    figure
+    plot(phaseplot(:,1:10:end))
+    xlabel('dll step')
+    ylabel('phase')
+    title('Pixel-by-Pixel Phase Calibration (1 of every 10 pixels)')
+end
 
 %% Make movie of flat field phase vs dll
-flatfigure = figure;
-flatframes(NUMDLL) = struct('cdata',[],'colormap',[]);
-flatmovie = VideoWriter('flatframes.avi');
-flatmovie.open();
-for i=1:NUMDLL
-    imagesc(flatimage(i).phase)
-    colorbar
-    drawnow
-    flatframes(i) = getframe(flatfigure);
-    writeVideo(flatmovie, flatframes(i));
+if ~isempty(find(strcmpi(inparams.genfigures,'movie')))
+    flatfigure = figure;
+    flatframes(NUMDLL) = struct('cdata',[],'colormap',[]);
+    flatmovie = VideoWriter('flatframes.avi');
+    flatmovie.open();
+    for i=1:NUMDLL
+        imagesc(flatimage(i).phase)
+        colorbar
+        drawnow
+        flatframes(i) = getframe(flatfigure);
+        writeVideo(flatmovie, flatframes(i));
+    end
 end
 
 %% Calculate phase std of each pixel at each dll step
@@ -209,5 +239,5 @@ rawphases = zeros([IMAGESIZE, length(useframes)]);
 
 calibration.modfreq = files(frames(useframes(1)).fileinds(1)).frequency;
 calibration.frequency = calibration.modfreq;
-save('Calibration','calibration')
+save(sprintf('Calibration%.1fC.mat',calibration.meantemperature),'calibration')
 cd(wd)
